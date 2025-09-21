@@ -88,13 +88,9 @@
                         <h3 id="popup-level-name">关卡名称</h3>
                         <p id="popup-level-desc">关卡描述信息...</p>
                         <div class="level-stats">
-                            <div class="stat-item">
-                                <span class="stat-label">难度:</span>
-                                <span id="popup-difficulty" class="stat-value">简单</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">推荐等级:</span>
-                                <span id="popup-level-req" class="stat-value">1级</span>
+                            <div class="stat-item enemies-info">
+                                <span class="stat-label">可能出现敌人:</span>
+                                <div id="popup-enemies" class="enemies-list">敌人信息</div>
                             </div>
                         </div>
                     </div>
@@ -107,6 +103,11 @@
 
         <!-- 关卡场景界面 -->
         <div id="level-scene" class="screen">
+            <!-- 暂停按钮 -->
+            <div id="pause-button" class="pause-button">
+                <span>⏸️</span>
+            </div>
+            
             <div class="level-scene-container">
                 <!-- 关卡背景 -->
                 <div class="level-background">
@@ -213,6 +214,17 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- 暂停菜单 -->
+            <div id="pause-menu" class="pause-menu-overlay">
+                <div class="pause-menu-content">
+                    <h2>游戏暂停</h2>
+                    <div class="pause-menu-buttons">
+                        <button id="resume-game-btn" class="pause-menu-button resume">继续游戏</button>
+                        <button id="back-to-levels-from-pause-btn" class="pause-menu-button back">返回关卡选择</button>
+                    </div>
+                </div>
+            </div>
         </div>
         </div>
     </div>
@@ -271,8 +283,9 @@
                         <div class="member-info">
                             <div class="member-avatar archer-avatar"></div>
                             <div class="member-details">
-                                <h3>友一 - 弓手</h3>
+                                <h3>弓手</h3>
                                 <p>远程攻击单位，擅长精准射击</p>
+                                <p class="bonus-text">加成：每有一个增加35%投射物伤害</p>
                             </div>
                         </div>
                         <div class="member-controls">
@@ -287,8 +300,9 @@
                         <div class="member-info">
                             <div class="member-avatar villager-avatar"></div>
                             <div class="member-details">
-                                <h3>友二 - 村民</h3>
+                                <h3>村民</h3>
                                 <p>支援单位，提供后勤保障</p>
+                                <p class="bonus-text">加成：每有一个增加20%玩家血量</p>
                             </div>
                         </div>
                         <div class="member-controls">
@@ -303,8 +317,9 @@
                         <div class="member-info">
                             <div class="member-avatar knight-avatar"></div>
                             <div class="member-details">
-                                <h3>友三 - 骑士</h3>
+                                <h3>骑士</h3>
                                 <p>近战单位，拥有强大的防御力</p>
+                                <p class="bonus-text">加成：每有一个反弹20%所受伤害给敌人</p>
                             </div>
                         </div>
                         <div class="member-controls">
@@ -338,6 +353,8 @@
     <script src="js/inputSystem.js"></script>
     <script src="js/collisionSystem.js"></script>
     <script src="js/projectileSystem.js"></script>
+    <script src="js/pauseMenu.js"></script>
+    <script src="js/audioManager.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
