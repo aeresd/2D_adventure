@@ -9,8 +9,7 @@ class Popup {
         this.popupLevelImg = document.getElementById('popup-level-img');
         this.popupLevelName = document.getElementById('popup-level-name');
         this.popupLevelDesc = document.getElementById('popup-level-desc');
-        this.popupDifficulty = document.getElementById('popup-difficulty');
-        this.popupLevelReq = document.getElementById('popup-level-req');
+        this.popupEnemies = document.getElementById('popup-enemies');
         this.closeButton = document.getElementById('close-popup-btn');
         this.confirmButton = document.getElementById('confirm-level-btn');
         
@@ -116,40 +115,10 @@ class Popup {
         // 更新关卡描述
         this.popupLevelDesc.textContent = levelData.description;
         
-        // 更新难度
-        this.popupDifficulty.textContent = levelData.difficulty;
-        this.updateDifficultyColor(levelData.difficulty);
-        
-        // 更新等级要求
-        this.popupLevelReq.textContent = levelData.levelReq;
+        // 更新敌人信息
+        this.popupEnemies.textContent = levelData.enemies || '暂无敌人信息';
     }
 
-    /**
-     * 根据难度更新颜色
-     * @param {string} difficulty - 难度等级
-     */
-    updateDifficultyColor(difficulty) {
-        // 移除之前的难度颜色类
-        this.popupDifficulty.className = 'stat-value';
-        
-        // 根据难度添加对应的颜色类
-        switch(difficulty) {
-            case '简单':
-                this.popupDifficulty.style.color = '#90EE90'; // 浅绿色
-                break;
-            case '中等':
-                this.popupDifficulty.style.color = '#FFD700'; // 金色
-                break;
-            case '困难':
-                this.popupDifficulty.style.color = '#FF8C00'; // 橙色
-                break;
-            case '极难':
-                this.popupDifficulty.style.color = '#FF4500'; // 红色
-                break;
-            default:
-                this.popupDifficulty.style.color = '#ffd700'; // 默认金色
-        }
-    }
 
     /**
      * 确认按钮点击处理

@@ -495,6 +495,49 @@ body {
     image-rendering: crisp-edges;
 }
 
+/* 天空背景层 */
+.sky-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 200%; /* 双倍宽度用于无缝循环 */
+    height: 100%;
+    z-index: 0; /* 最低层级 */
+    overflow: hidden;
+    display: none; /* 默认隐藏 */
+}
+
+.sky-bg-image {
+    position: absolute;
+    top: 0;
+    width: 50%; /* 实际图片宽度为容器的一半 */
+    height: 100%;
+    object-fit: cover;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+}
+
+.sky-bg-1 {
+    left: 0;
+    animation: skyScroll 30s linear infinite; /* 30秒循环滚动 */
+}
+
+.sky-bg-2 {
+    left: 50%;
+    animation: skyScroll 30s linear infinite; /* 30秒循环滚动 */
+}
+
+/* 天空背景滚动动画 */
+@keyframes skyScroll {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
 /* 地面线条 */
 .ground-line {
     position: absolute;

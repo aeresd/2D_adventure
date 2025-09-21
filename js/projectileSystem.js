@@ -7,6 +7,7 @@ class ProjectileSystem {
         this.projectiles = [];
         this.fragments = []; // 碎片数组
         this.isActive = true;
+        this.isPaused = false;
         this.collisionSystem = null;
         this.pendingDamage = 0; // 累积的待处理伤害
         
@@ -16,7 +17,7 @@ class ProjectileSystem {
             height: 50, // 调整为素材实际尺寸
             speed: 12, // 投射物速度（提高速度）
             gravity: 0.1, // 重力影响（进一步减小重力）
-            damage: 100, // 固定扣除10%血量
+            damage:6, // 
             angleRange: 10, // 角度变化范围（度）（减小范围）
             baseAngle: 0, // 基础角度
             trailLength: 5, // 轨迹长度
@@ -84,7 +85,7 @@ class ProjectileSystem {
      * 向敌人发射投射物
      */
     fireAtEnemy() {
-        if (!this.isActive) return;
+        if (!this.isActive || this.isPaused) return;
         
         // 检查敌人是否存在且可见
         const enemyElement = document.getElementById('enemy');
@@ -250,7 +251,7 @@ class ProjectileSystem {
      * 更新所有投射物
      */
     update() {
-        if (!this.isActive) return;
+        if (!this.isActive || this.isPaused) return;
         
         const currentTime = Date.now();
         
@@ -420,6 +421,9 @@ class ProjectileSystem {
         // 扣除敌人血量
         this.damageEnemy();
         
+        // 检查连击数，如果是3的倍数则重置敌人倒计时
+        this.checkComboResetCountdown();
+        
         // 显示击中效果
         this.showHitEffect(projectile);
         
@@ -429,10 +433,26 @@ class ProjectileSystem {
         // 触发击中事件
         this.triggerHitEvent(projectile);
         
+        // 触发音效事件
+        const hitEvent = new CustomEvent('projectileHit');
+        document.dispatchEvent(hitEvent);
+        
         // 销毁投射物
         this.destroyProjectile(projectile, index);
         
         console.log('投射物击中敌人，扣除10%血量，创建分裂效果');
+    }
+    
+    /**
+     * 检查连击数并重置倒计时
+     */
+    checkComboResetCountdown() {
+        const inputSystem = window.gameModules?.inputSystem;
+        if (inputSystem && inputSystem.combo > 0 && inputSystem.combo % 3 === 0) {
+            console.log(`连击数达到 ${inputSystem.combo}，重置敌人倒计时`);
+            inputSystem.resetCountdown();
+            inputSystem.startCountdown();
+        }
     }
     
     /**
@@ -464,9 +484,15 @@ class ProjectileSystem {
             const currentHealth = healthStatus.enemy.current;
             const maxHealth = healthStatus.enemy.max;
             
-            // 计算伤害（10%）
-            const damage = Math.ceil(maxHealth * (this.config.damage / 100));
-            const newHealth = Math.max(0, currentHealth - damage);
+            // 计算基础伤害（固定伤害）
+            const baseDamage = this.config.damage;
+            
+            // 获取友军加成
+            const bonuses = inputSystem.calculateTeamBonuses();
+            const damageMultiplier = 1 + bonuses.projectileDamageBonus;
+            const finalDamage = Math.ceil(baseDamage * damageMultiplier);
+            
+            const newHealth = Math.max(0, currentHealth - finalDamage);
             
             // 更新血量
             inputSystem.updateEnemyHealth(newHealth, maxHealth);
@@ -474,7 +500,7 @@ class ProjectileSystem {
             // 触发敌人受击动画
             inputSystem.playHitAnimation('enemy');
             
-            console.log(`敌人受到 ${damage} 点伤害，剩余血量: ${newHealth}/${maxHealth}`);
+            console.log(`敌人受到 ${finalDamage} 点伤害（基础${baseDamage}，友军一加成${Math.round(bonuses.projectileDamageBonus * 100)}%），剩余血量: ${newHealth}/${maxHealth}`);
             
             // 检查敌人是否死亡
             if (newHealth <= 0) {
@@ -536,6 +562,22 @@ class ProjectileSystem {
     setActive(active) {
         this.isActive = active;
         console.log('投射物系统', active ? '已激活' : '已停用');
+    }
+
+    /**
+     * 暂停投射物系统
+     */
+    pause() {
+        this.isPaused = true;
+        console.log('投射物系统已暂停');
+    }
+
+    /**
+     * 恢复投射物系统
+     */
+    resume() {
+        this.isPaused = false;
+        console.log('投射物系统已恢复');
     }
     
     /**
@@ -828,7 +870,7 @@ class ProjectileSystem {
      * 更新所有碎片
      */
     updateFragments() {
-        if (!this.isActive) return;
+        if (!this.isActive || this.isPaused) return;
         
         const currentTime = Date.now();
         

@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM加载完成，开始初始化游戏...');
     
     // 初始化游戏模块
-    let gameManager, mainMenu, levelSelect, popup, victoryPopup, inputSystem, collisionSystem, projectileSystem;
+    let gameManager, mainMenu, levelSelect, popup, victoryPopup, inputSystem, collisionSystem, projectileSystem, pauseMenu, audioManager;
     
     try {
         // 创建游戏管理器实例
@@ -36,6 +36,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // 创建投射物系统实例
         projectileSystem = new ProjectileSystem();
         
+        // 创建暂停菜单实例
+        pauseMenu = new PauseMenu();
+        
+        // 创建音频管理器实例
+        audioManager = new AudioManager();
+        
         console.log('所有游戏模块初始化完成');
         
         // 将模块实例暴露到全局作用域，便于调试和未来库集成
@@ -47,7 +53,9 @@ document.addEventListener('DOMContentLoaded', function() {
             victoryPopup,
             inputSystem,
             collisionSystem,
-            projectileSystem
+            projectileSystem,
+            pauseMenu,
+            audioManager
         };
         
         // 初始化系统间的连接

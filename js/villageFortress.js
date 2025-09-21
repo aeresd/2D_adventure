@@ -96,6 +96,13 @@ class VillageFortressPopup {
     }
 
     increaseCount(member) {
+        // 检查总人数是否达到上限（12人）
+        const totalCount = this.teamCounts.archer + this.teamCounts.villager + this.teamCounts.knight;
+        if (totalCount >= 12) {
+            console.log('队伍人数已达上限（12人），无法继续增加');
+            return;
+        }
+        
         // 检查库存是否足够
         if (this.teamCounts[member] < this.inventory[member]) {
             this.teamCounts[member]++;
@@ -135,13 +142,28 @@ class VillageFortressPopup {
     }
 
     updateButtonStates() {
+        // 计算总人数
+        const totalCount = this.teamCounts.archer + this.teamCounts.villager + this.teamCounts.knight;
+        const isAtMaxCapacity = totalCount >= 12;
+        
         // 更新增加按钮的可用性
         const increaseBtns = document.querySelectorAll('.increase-btn');
         increaseBtns.forEach(btn => {
             const member = btn.getAttribute('data-member');
-            const canIncrease = this.teamCounts[member] < this.inventory[member];
+            const hasInventory = this.teamCounts[member] < this.inventory[member];
+            const canIncrease = hasInventory && !isAtMaxCapacity;
+            
             btn.disabled = !canIncrease;
             btn.style.opacity = canIncrease ? '1' : '0.5';
+            
+            // 添加提示文本
+            if (isAtMaxCapacity) {
+                btn.title = '队伍人数已达上限（12人）';
+            } else if (!hasInventory) {
+                btn.title = '库存不足';
+            } else {
+                btn.title = '';
+            }
         });
     }
 
@@ -210,27 +232,28 @@ class VillageFortressPopup {
 
     // 添加友军（战斗胜利后调用）
     addAlly(type) {
-        if (this.teamCounts[type] < 10) {
-            this.teamCounts[type]++;
-            this.originalCounts[type]++;
-            this.updateDisplay();
-            console.log(`添加了一个${type}，当前数量: ${this.teamCounts[type]}`);
+        // 直接添加到库存，不设限制
+        this.inventory[type]++;
+        this.teamCounts[type]++;
+        this.originalCounts[type]++;
+        
+        // 同步到存档系统
+        if (window.saveManager) {
+            window.saveManager.updateInventory(this.inventory);
         }
+        
+        this.updateDisplay();
+        console.log(`添加了一个${type}到库存，当前库存: ${this.inventory[type]}，队伍数量: ${this.teamCounts[type]}`);
     }
 
     // 批量添加解救的友军（战斗胜利后调用）
     addRescuedAllies(rescueStats) {
         console.log('批量添加解救的友军到库存:', rescueStats);
         
-        // 添加解救的友军到库存中
+        // 添加解救的友军到库存中，不设限制
         this.inventory.archer += rescueStats.archer;
         this.inventory.villager += rescueStats.villager;
         this.inventory.knight += rescueStats.knight;
-        
-        // 限制最大库存数量为20
-        this.inventory.archer = Math.min(this.inventory.archer, 20);
-        this.inventory.villager = Math.min(this.inventory.villager, 20);
-        this.inventory.knight = Math.min(this.inventory.knight, 20);
         
         // 同步到存档系统
         if (window.saveManager) {

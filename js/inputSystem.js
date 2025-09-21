@@ -8,6 +8,7 @@ class InputSystem {
         this.currentSequence = [];
         this.currentIndex = 0;
         this.isActive = false;
+        this.isPaused = false;
         this.score = 0;
         this.combo = 0;
         this.maxCombo = 0;
@@ -21,8 +22,8 @@ class InputSystem {
         this.timerTextElement = null;
         
         // 血条相关属性
-        this.playerHealth = 100;
-        this.playerMaxHealth = 100;
+        this.playerHealth = 30;
+        this.playerMaxHealth = 30;
         this.enemyHealth = 10; // 调整为10%以便测试
         this.enemyMaxHealth = 100;
         this.playerHealthElement = null;
@@ -54,6 +55,22 @@ class InputSystem {
             countdownDuration: 10, // 倒计时时长
             damage: 10, // 对玩家造成的伤害
             health: 10 // 敌人血量
+        };
+
+        // 敌人类型血量配置
+        this.enemyHealthConfig = {
+            'enemy-one': 30,    // 敌人1：30血
+            'enemy-two': 25,    // 敌人2：25血
+            'enemy-three': 45,  // 敌人3：45血
+            'enemy-four': 80    // 敌人4：80血
+        };
+
+        // 敌人类型攻击力配置
+        this.enemyDamageConfig = {
+            'enemy-one': 7,     // 敌人1：7攻击力
+            'enemy-two': 15,    // 敌人2：15攻击力
+            'enemy-three': 7,   // 敌人3：7攻击力
+            'enemy-four': 25    // 敌人4：25攻击力
         };
         
         // 敌人类型池和概率系统
@@ -173,6 +190,12 @@ class InputSystem {
      * 开始新的按键序列
      */
     startNewSequence() {
+        // 如果游戏暂停，不启动新序列
+        if (this.isPaused) {
+            console.log('游戏已暂停，不启动新序列');
+            return;
+        }
+        
         // 清除之前的状态
         this.clearKeyStates();
         this.stopTimer(); // 停止之前的倒计时
@@ -473,9 +496,33 @@ class InputSystem {
     }
 
     /**
+     * 暂停游戏
+     */
+    pauseGame() {
+        this.isPaused = true;
+        this.stopTimer();
+        this.stopCountdown();
+        console.log('游戏已暂停');
+    }
+
+    /**
+     * 恢复游戏
+     */
+    resumeGame() {
+        this.isPaused = false;
+        console.log('游戏已恢复');
+    }
+
+    /**
      * 开始倒计时
      */
     startTimer() {
+        // 如果游戏暂停，不启动倒计时
+        if (this.isPaused) {
+            console.log('游戏已暂停，不启动倒计时');
+            return;
+        }
+        
         if (!this.timerElement || !this.progressElement) {
             console.warn('倒计时元素未找到');
             return;
@@ -741,15 +788,30 @@ class InputSystem {
         if (this.playerHealthElement && this.playerHealthTextElement) {
             const percentage = (this.playerHealth / this.playerMaxHealth) * 100;
             this.playerHealthElement.style.width = `${percentage}%`;
-            this.playerHealthTextElement.textContent = `${Math.round(percentage)}%`;
+            
+            // 优化血量百分比显示：如果携带村民且为满血，显示100%
+            const allyCounts = this.getCurrentAllyCounts();
+            const hasVillagers = allyCounts.villager > 0;
+            const isFullHealth = this.playerHealth >= this.playerMaxHealth;
+            
+            if (hasVillagers && isFullHealth) {
+                this.playerHealthTextElement.textContent = '100%';
+            } else {
+                this.playerHealthTextElement.textContent = `${Math.round(percentage)}%`;
+            }
             
             // 根据血量改变血条颜色
             this.playerHealthElement.classList.remove('warning', 'danger');
-            if (this.playerHealth <= 25) {
+            if (this.playerHealth <= this.playerMaxHealth * 0.25) {
                 this.playerHealthElement.classList.add('danger');
-            } else if (this.playerHealth <= 50) {
+            } else if (this.playerHealth <= this.playerMaxHealth * 0.5) {
                 this.playerHealthElement.classList.add('warning');
             }
+        }
+        
+        // 检查玩家是否死亡
+        if (this.playerHealth <= 0) {
+            this.handlePlayerDeath();
         }
     }
 
@@ -758,7 +820,12 @@ class InputSystem {
      * @param {number} health - 当前血量
      * @param {number} maxHealth - 最大血量
      */
-    updateEnemyHealth(health, maxHealth = this.enemyMaxHealth) {
+    updateEnemyHealth(health, maxHealth = null) {
+        // 如果没有指定最大血量，使用当前敌人配置的血量
+        if (maxHealth === null) {
+            maxHealth = this.enemyConfig.health;
+        }
+        
         this.enemyHealth = Math.max(0, Math.min(health, maxHealth));
         this.enemyMaxHealth = maxHealth;
         
@@ -774,16 +841,33 @@ class InputSystem {
      * @param {number} damage - 伤害值
      */
     damagePlayer(damage) {
-        const newHealth = this.playerHealth - damage;
+        const bonuses = this.calculateTeamBonuses();
+        
+        // 计算反弹伤害
+        const reflectedDamage = Math.floor(damage * bonuses.damageReflectBonus);
+        
+        // 实际受到的伤害
+        const actualDamage = damage - reflectedDamage;
+        const newHealth = this.playerHealth - actualDamage;
         this.updatePlayerHealth(newHealth);
         
         // 播放受击动画
         this.playHitAnimation('player');
         
+        // 触发玩家受伤音效事件
+        const hitEvent = new CustomEvent('playerHit');
+        document.dispatchEvent(hitEvent);
+        
         // 处理友军损失
         this.handleAllyDamage();
         
-        console.log(`玩家受到 ${damage} 点伤害，剩余血量: ${this.playerHealth}`);
+        // 如果有反弹伤害，对敌人造成伤害
+        if (reflectedDamage > 0) {
+            this.damageEnemy(reflectedDamage);
+            console.log(`友军三反弹：反弹 ${reflectedDamage} 点伤害给敌人`);
+        }
+        
+        console.log(`玩家受到 ${damage} 点伤害，实际受到 ${actualDamage} 点，反弹 ${reflectedDamage} 点，剩余血量: ${this.playerHealth}`);
     }
 
     /**
@@ -795,12 +879,19 @@ class InputSystem {
         
         // 检查每个友军类型是否有损失
         const allyTypes = ['archer', 'villager', 'knight'];
+        const lostAllies = [];
         
         allyTypes.forEach(allyType => {
             if (allyCounts[allyType] > 0 && Math.random() < 0.35) { // 35%概率损失
                 this.loseAlly(allyType);
+                lostAllies.push(allyType);
             }
         });
+        
+        // 如果有友军损失，显示合并的提示
+        if (lostAllies.length > 0) {
+            this.showCombinedAllyLossNotification(lostAllies);
+        }
     }
 
     /**
@@ -819,14 +910,60 @@ class InputSystem {
     }
 
     /**
+     * 计算友军加成效果
+     */
+    calculateTeamBonuses() {
+        const allyCounts = this.getCurrentAllyCounts();
+        
+        return {
+            // 友军一（弓手）：投射物伤害加成，每个+35%
+            projectileDamageBonus: allyCounts.archer * 0.35,
+            
+            // 友军二（村民）：玩家血量加成，每个+20%
+            playerHealthBonus: allyCounts.villager * 0.2,
+            
+            // 友军三（骑士）：伤害反弹，每个反弹20%
+            damageReflectBonus: allyCounts.knight * 0.2
+        };
+    }
+
+    /**
+     * 应用友军加成到玩家血量
+     */
+    applyTeamBonusesToPlayerHealth() {
+        const bonuses = this.calculateTeamBonuses();
+        const baseHealth = 30; // 基础血量
+        const bonusHealth = Math.floor(baseHealth * bonuses.playerHealthBonus);
+        const newMaxHealth = baseHealth + bonusHealth;
+        
+        // 更新最大血量
+        this.playerMaxHealth = newMaxHealth;
+        
+        // 如果携带村民，玩家血量设为满血状态
+        const allyCounts = this.getCurrentAllyCounts();
+        if (allyCounts.villager > 0) {
+            this.playerHealth = newMaxHealth; // 满血状态
+        } else {
+            // 如果没有村民，保持当前血量比例
+            const currentPercentage = this.playerHealth / this.playerMaxHealth;
+            this.playerHealth = Math.floor(newMaxHealth * currentPercentage);
+        }
+        
+        // 更新血条显示
+        this.updatePlayerHealth(this.playerHealth, this.playerMaxHealth);
+        
+        console.log(`友军二加成：血量从30增加到${newMaxHealth}（+${bonusHealth}），当前血量: ${this.playerHealth}`);
+    }
+
+    /**
      * 失去一个友军
      * @param {string} allyType - 友军类型
      */
     loseAlly(allyType) {
         const allyNames = {
-            'archer': '友一',
-            'villager': '友二', 
-            'knight': '友三'
+            'archer': '弓手',
+            'villager': '村民', 
+            'knight': '骑士'
         };
 
         const allyCounts = this.getCurrentAllyCounts();
@@ -838,9 +975,6 @@ class InputSystem {
             
             // 记录损失统计
             this.recordLoss(allyType);
-            
-            // 显示损失提示
-            this.showAllyLossNotification(allyType, newCount);
             
             // 如果数量归零，开始消失动画
             if (newCount === 0) {
@@ -905,6 +1039,11 @@ class InputSystem {
             
             // 注意：不更新库存到存档，库存应该保持原有数量
         }
+
+        // 重新应用友军加成（特别是友军二的血量加成）
+        if (allyType === 'villager') {
+            this.applyTeamBonusesToPlayerHealth();
+        }
     }
 
     /**
@@ -914,9 +1053,9 @@ class InputSystem {
      */
     showAllyLossNotification(allyType, remainingCount) {
         const allyNames = {
-            'archer': '友一',
-            'villager': '友二',
-            'knight': '友三'
+            'archer': '弓手',
+            'villager': '村民',
+            'knight': '骑士'
         };
 
         // 创建损失提示元素
@@ -939,6 +1078,68 @@ class InputSystem {
             z-index: 1000;
             pointer-events: none;
             animation: allyLossFloat 2s ease-out forwards;
+        `;
+
+        // 添加到页面
+        document.body.appendChild(notification);
+
+        // 2秒后移除
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 2000);
+    }
+
+    /**
+     * 显示合并的友军损失提示
+     * @param {Array} lostAllies - 损失的友军类型数组
+     */
+    showCombinedAllyLossNotification(lostAllies) {
+        const allyNames = {
+            'archer': '弓手',
+            'villager': '村民',
+            'knight': '骑士'
+        };
+
+        // 获取当前友军数量
+        const allyCounts = this.getCurrentAllyCounts();
+        
+        // 构建损失信息
+        let lossText = '';
+        if (lostAllies.length === 1) {
+            const allyType = lostAllies[0];
+            lossText = `${allyNames[allyType]} -1 (剩余: ${allyCounts[allyType]})`;
+        } else {
+            // 多个友军损失
+            const lossDetails = lostAllies.map(allyType => 
+                `${allyNames[allyType]} -1 (剩余: ${allyCounts[allyType]})`
+            ).join('\n');
+            lossText = `友军损失:\n${lossDetails}`;
+        }
+
+        // 创建损失提示元素
+        const notification = document.createElement('div');
+        notification.className = 'ally-loss-notification';
+        notification.textContent = lossText;
+        
+        // 设置样式
+        notification.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 0, 0, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            z-index: 1000;
+            pointer-events: none;
+            animation: allyLossFloat 2s ease-out forwards;
+            white-space: pre-line;
+            text-align: center;
         `;
 
         // 添加到页面
@@ -990,6 +1191,11 @@ class InputSystem {
         this.setEnemyState('hit');
         
         console.log(`敌人受到 ${damage} 点伤害，剩余血量: ${this.enemyHealth}`);
+        
+        // 检查敌人是否死亡
+        if (newHealth <= 0) {
+            this.handleEnemyDeath();
+        }
     }
 
     /**
@@ -1018,6 +1224,29 @@ class InputSystem {
             }
         };
     }
+
+    /**
+     * 处理玩家死亡
+     */
+    handlePlayerDeath() {
+        console.log('玩家死亡！游戏失败');
+        
+        // 停止倒计时
+        this.stopCountdown();
+        
+        // 停止输入系统
+        this.stopTimer();
+        this.isActive = false;
+        
+        // 停止投射物系统
+        const projectileSystem = window.gameModules?.projectileSystem;
+        if (projectileSystem) {
+            projectileSystem.isActive = false;
+        }
+        
+        // 触发游戏失败事件
+        this.triggerGameOver();
+    }
     
     /**
      * 处理敌人死亡
@@ -1033,6 +1262,10 @@ class InputSystem {
         
         // 播放敌人死亡动画
         this.playEnemyDeathAnimation();
+        
+        // 触发敌人死亡音效事件
+        const deathEvent = new CustomEvent('enemyDeath');
+        document.dispatchEvent(deathEvent);
         
         // 检查是否还有重生次数
         if (this.respawnCount > 0) {
@@ -1194,6 +1427,141 @@ class InputSystem {
             });
             document.dispatchEvent(event);
         }
+    }
+
+    /**
+     * 触发游戏失败事件
+     */
+    triggerGameOver() {
+        console.log('触发游戏失败事件');
+        
+        // 创建游戏失败弹窗
+        this.createGameOverPopup();
+    }
+
+    /**
+     * 创建游戏失败弹窗
+     */
+    createGameOverPopup() {
+        // 创建弹窗容器
+        const popup = document.createElement('div');
+        popup.id = 'game-over-popup';
+        popup.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            font-family: Arial, sans-serif;
+        `;
+
+        // 创建弹窗内容
+        const content = document.createElement('div');
+        content.style.cssText = `
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            border: 3px solid #e74c3c;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            color: white;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        `;
+
+        // 获取游戏统计
+        const gameStats = {
+            maxCombo: this.maxCombo || 0,
+            finalHealth: this.playerHealth,
+            maxHealth: this.playerMaxHealth
+        };
+
+        // 创建失败消息
+        content.innerHTML = `
+            <h2 style="color: #e74c3c; margin-bottom: 20px; font-size: 2em;">游戏失败</h2>
+            <p style="font-size: 1.2em; margin-bottom: 20px;">您的血量已归零，战斗失败！</p>
+            
+            <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="color: #f39c12; margin-bottom: 10px;">战斗统计</h3>
+                <p style="margin: 5px 0;">最高连击: ${gameStats.maxCombo}</p>
+                <p style="margin: 5px 0;">最终血量: ${gameStats.finalHealth}/${gameStats.maxHealth}</p>
+            </div>
+            
+            <div style="margin-top: 25px;">
+                <button id="back-to-level-select-btn" style="
+                    background: #3498db;
+                    color: white;
+                    border: none;
+                    padding: 15px 30px;
+                    border-radius: 5px;
+                    font-size: 1.2em;
+                    cursor: pointer;
+                    transition: background 0.3s;
+                " onmouseover="this.style.background='#2980b9'" onmouseout="this.style.background='#3498db'">
+                    返回关卡选择
+                </button>
+            </div>
+        `;
+
+        popup.appendChild(content);
+        document.body.appendChild(popup);
+
+        // 绑定按钮事件
+        document.getElementById('back-to-level-select-btn').addEventListener('click', () => {
+            this.backToLevelSelect();
+        });
+    }
+
+
+    /**
+     * 返回关卡选择页
+     */
+    backToLevelSelect() {
+        // 移除失败弹窗
+        const popup = document.getElementById('game-over-popup');
+        if (popup) {
+            popup.remove();
+        }
+
+        // 重置游戏状态
+        this.resetGame();
+        
+        // 返回关卡选择页
+        const event = new CustomEvent('backToLevelSelect');
+        document.dispatchEvent(event);
+    }
+
+    /**
+     * 重置游戏状态
+     */
+    resetGame() {
+        // 重置血量
+        this.playerHealth = 30;
+        this.playerMaxHealth = 30;
+        
+        // 重置分数和连击
+        this.score = 0;
+        this.combo = 0;
+        this.maxCombo = 0;
+        
+        // 停止所有系统
+        this.stopTimer();
+        this.stopCountdown();
+        this.isActive = false;
+        
+        // 重置投射物系统
+        const projectileSystem = window.gameModules?.projectileSystem;
+        if (projectileSystem) {
+            projectileSystem.isActive = true;
+            projectileSystem.clearPendingDamage();
+        }
+        
+        console.log('游戏状态已重置');
     }
 
     /**
@@ -1451,11 +1819,14 @@ class InputSystem {
         // 更新重生次数显示
         this.updateRespawnCount();
         
+        // 重置倒计时（在重生动画之前）
+        this.resetCountdown();
+        
         // 从未知处开始重生动画
         this.startRespawnAnimation();
         
-        // 重置倒计时
-        this.resetCountdown();
+        // 立即启动新的倒计时
+        this.startCountdown();
         
         // 检查是否还有重生次数
         if (this.respawnCount <= 0) {
@@ -1474,17 +1845,14 @@ class InputSystem {
         this.enemyElement.style.display = 'flex';
         this.enemyElement.classList.remove('dying');
         
-        // 重置敌人血量为10（便于测试）
-        this.updateEnemyHealth(10);
+        // 重置敌人血量为当前配置的血量
+        this.updateEnemyHealth(this.enemyConfig.health, this.enemyConfig.health);
         
         // 应用累积的伤害
         const projectileSystem = window.gameModules?.projectileSystem;
         if (projectileSystem) {
             projectileSystem.applyPendingDamage();
         }
-        
-        // 重新启动倒计时进度条
-        this.startCountdown();
         
         this.isRespawning = false;
         console.log('敌人重生完成');
@@ -1572,6 +1940,12 @@ class InputSystem {
      * 开始倒计时
      */
     startCountdown() {
+        // 如果游戏暂停，不启动倒计时
+        if (this.isPaused) {
+            console.log('游戏已暂停，不启动倒计时');
+            return;
+        }
+        
         if (this.isCountdownActive) return;
         
         this.isCountdownActive = true;
@@ -1580,11 +1954,15 @@ class InputSystem {
         
         // 重置倒计时进度条
         if (this.countdownProgressElement) {
+            // 确保进度条完全重置
             this.countdownProgressElement.style.transform = 'scaleX(1)';
             this.countdownProgressElement.classList.remove('shrinking');
             
             // 设置动态动画时长
             this.countdownProgressElement.style.animationDuration = `${this.countdownDuration}s`;
+            
+            // 强制重绘，然后添加动画类
+            this.countdownProgressElement.offsetHeight;
             this.countdownProgressElement.classList.add('shrinking');
         }
         
@@ -1630,10 +2008,13 @@ class InputSystem {
         
         // 重置倒计时进度条
         if (this.countdownProgressElement) {
+            // 强制重置进度条到初始状态
             this.countdownProgressElement.style.transform = 'scaleX(1)';
             this.countdownProgressElement.classList.remove('shrinking');
-            // 重置动画时长
+            // 清除动画时长，让startCountdown重新设置
             this.countdownProgressElement.style.animationDuration = '';
+            // 强制重绘，确保进度条立即重置
+            this.countdownProgressElement.offsetHeight;
         }
         
         console.log(`倒计时已重置为 ${this.countdownDuration} 秒`);
@@ -1716,8 +2097,11 @@ class InputSystem {
         this.clearLossStats();
         
         // 重置玩家血量为满血
-        this.playerHealth = 100;
-        this.updatePlayerHealth(this.playerHealth);
+        this.playerHealth = 30;
+        this.playerMaxHealth = 30;
+        
+        // 应用友军加成到玩家血量
+        this.applyTeamBonusesToPlayerHealth();
         
         // 清空投射物系统的累积伤害
         const projectileSystem = window.gameModules?.projectileSystem;
@@ -1755,8 +2139,14 @@ class InputSystem {
             this.applyRandomEnemyType();
         }
         
-        // 更新敌人血量
-        this.updateEnemyHealth(this.enemyConfig.health);
+        // 根据敌人类型更新血量和攻击力
+        const enemyHealth = this.getEnemyHealthByType(this.enemyConfig.type);
+        const enemyDamage = this.getEnemyDamageByType(this.enemyConfig.type);
+        this.enemyConfig.health = enemyHealth;
+        this.enemyConfig.damage = enemyDamage;
+        
+        // 更新敌人血量（同时设置当前血量和最大血量）
+        this.updateEnemyHealth(this.enemyConfig.health, this.enemyConfig.health);
         
         // 更新敌人外观
         this.updateEnemyAppearance();
@@ -1828,6 +2218,24 @@ class InputSystem {
     getEnemyConfig() {
         return this.enemyConfig;
     }
+
+    /**
+     * 根据敌人类型获取血量
+     * @param {string} enemyType - 敌人类型
+     * @returns {number} 敌人血量
+     */
+    getEnemyHealthByType(enemyType) {
+        return this.enemyHealthConfig[enemyType] || 10; // 默认10血
+    }
+
+    /**
+     * 根据敌人类型获取攻击力
+     * @param {string} enemyType - 敌人类型
+     * @returns {number} 敌人攻击力
+     */
+    getEnemyDamageByType(enemyType) {
+        return this.enemyDamageConfig[enemyType] || 10; // 默认10攻击力
+    }
     
     /**
      * 随机选择敌人类型
@@ -1886,13 +2294,22 @@ class InputSystem {
         // 更新敌人配置
         this.enemyConfig.type = selectedType;
         
+        // 根据敌人类型更新血量和攻击力
+        const enemyHealth = this.getEnemyHealthByType(selectedType);
+        const enemyDamage = this.getEnemyDamageByType(selectedType);
+        this.enemyConfig.health = enemyHealth;
+        this.enemyConfig.damage = enemyDamage;
+        
+        // 更新敌人血量（同时设置当前血量和最大血量）
+        this.updateEnemyHealth(enemyHealth, enemyHealth);
+        
         // 更新敌人外观
         this.updateEnemyAppearance();
         
         // 更新碰撞检测尺寸
         this.updateEnemyCollisionSize();
         
-        console.log(`已应用随机敌人类型: ${selectedType}`);
+        console.log(`已应用随机敌人类型: ${selectedType}，血量: ${enemyHealth}，攻击力: ${enemyDamage}`);
     }
     
     /**

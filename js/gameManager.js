@@ -157,6 +157,16 @@ class GameManager {
             groundLine.style.display = 'none';
         }
         
+        // 控制天空背景显示（仅关卡5显示）
+        const skyBackground = document.getElementById('sky-background');
+        if (skyBackground) {
+            if (levelId === '5') {
+                skyBackground.style.display = 'block';
+            } else {
+                skyBackground.style.display = 'none';
+            }
+        }
+        
         // 更新关卡信息
         const levelTitle = document.getElementById('level-scene-title');
         const levelDesc = document.getElementById('level-scene-desc');
@@ -170,8 +180,8 @@ class GameManager {
         // 切换到关卡场景
         this.switchScreen('levelScene');
         
-        // 根据关卡设置敌人类型
-        this.setEnemyForLevel(levelId);
+        // 根据关卡设置敌人类型（但不启动游戏）
+        this.setEnemyForLevel(levelId, false);
         
         // 触发关卡场景显示事件
         const event = new CustomEvent('levelSceneShown', {
@@ -185,8 +195,9 @@ class GameManager {
     /**
      * 根据关卡设置敌人类型
      * @param {string} levelId - 关卡ID
+     * @param {boolean} startGame - 是否立即启动游戏，默认为true
      */
-    setEnemyForLevel(levelId) {
+    setEnemyForLevel(levelId, startGame = true) {
         const inputSystem = window.gameModules?.inputSystem;
         if (!inputSystem) return;
         
@@ -203,72 +214,71 @@ class GameManager {
             '2': {
                 type: 'enemy-one', // 关卡2：敌人一（哥布林）- 森林村庄
                 level: 2,
-                countdownDuration: 8,
-                damage: 12,
-                health: 15,
+                countdownDuration: 10, // 森林村庄：10秒
+                damage: 7, // 使用敌人一的基础攻击力
                 respawnRange: { min: 2, max: 4 }, // 森林村庄：2-4次
                 firstEnemyMustBe: 'enemy-one', // 第一个敌人必须是敌人一
                 enemyTypes: [
-                    { type: 'enemy-one', probability: 0.8 },
-                    { type: 'enemy-two', probability: 0.1 },
-                    { type: 'enemy-three', probability: 0.09 },
-                    { type: 'enemy-four', probability: 0.01 }
+                    { type: 'enemy-one', probability: 0.65 },
+                    { type: 'enemy-two', probability: 0.18 },
+                    { type: 'enemy-three', probability: 0.15 },
+                    { type: 'enemy-four', probability: 0.02 }
                 ]
             },
             '3': {
                 type: 'enemy-two', // 关卡3：敌人二（骷髅）- 军事哨站
                 level: 3,
-                countdownDuration: 7,
-                damage: 15,
-                health: 20,
+                countdownDuration: 10, // 军事哨站：10秒
+                damage: 15, // 使用敌人二的基础攻击力
                 respawnRange: { min: 2, max: 4 }, // 军事哨站：2-4次
                 firstEnemyMustBe: 'enemy-two', // 第一个敌人必须是敌人二
                 enemyTypes: [
-                    { type: 'enemy-one', probability: 0.35 },
-                    { type: 'enemy-two', probability: 0.5 },
-                    { type: 'enemy-three', probability: 0.15 }
+                    { type: 'enemy-one', probability: 0.30 },
+                    { type: 'enemy-two', probability: 0.50 },
+                    { type: 'enemy-three', probability: 0.17 },
+                    { type: 'enemy-four', probability: 0.03 }
                 ]
             },
             '4': {
                 type: 'enemy-four', // 关卡4：敌人四（猫）- 长城防线（临时使用敌人四）
                 level: 4,
-                countdownDuration: 6,
-                damage: 18,
-                health: 25,
+                countdownDuration: 10, // 长城防线：10秒
+                damage: 25, // 使用敌人四的基础攻击力
                 respawnRange: { min: 2, max: 4 }, // 长城防线：2-4次
                 firstEnemyMustBe: 'enemy-three', // 第一个敌人必须是敌人三
                 enemyTypes: [
-                    { type: 'enemy-one', probability: 0.2 },
-                    { type: 'enemy-two', probability: 0.2 },
-                    { type: 'enemy-three', probability: 0.6 }
+                    { type: 'enemy-one', probability: 0.17 },
+                    { type: 'enemy-two', probability: 0.20 },
+                    { type: 'enemy-three', probability: 0.60 },
+                    { type: 'enemy-four', probability: 0.03 }
                 ]
             },
             '5': {
                 type: 'enemy-three', // 关卡5：敌人三（史莱姆）- 石桥通道
                 level: 5,
-                countdownDuration: 5,
-                damage: 20,
-                health: 30,
+                countdownDuration: 9, // 石桥通道：9秒
+                damage: 7, // 使用敌人三的基础攻击力
                 respawnRange: { min: 3, max: 6 }, // 石桥通道：3-6次
                 firstEnemyTypes: ['enemy-one', 'enemy-two', 'enemy-three'], // 第一个敌人从1/2/3中随机
                 enemyTypes: [
-                    { type: 'enemy-one', probability: 1/3 },
-                    { type: 'enemy-two', probability: 1/3 },
-                    { type: 'enemy-three', probability: 1/3 }
+                    { type: 'enemy-one', probability: 0.30 },
+                    { type: 'enemy-two', probability: 0.30 },
+                    { type: 'enemy-three', probability: 0.37 },
+                    { type: 'enemy-four', probability: 0.03 }
                 ]
             },
             '6': {
                 type: 'enemy-four', // 关卡6：敌人四（猫）- 主城城堡
                 level: 6,
-                countdownDuration: 4,
-                damage: 25,
-                health: 40,
+                countdownDuration: 8, // 主城城堡：8秒
+                damage: 25, // 使用敌人四的基础攻击力
                 respawnRange: { min: 7, max: 10 }, // 主城城堡：7-10次
                 firstEnemyTypes: ['enemy-one', 'enemy-two', 'enemy-three'], // 第一个敌人从1/2/3中随机
                 enemyTypes: [
-                    { type: 'enemy-one', probability: 1/3 },
-                    { type: 'enemy-two', probability: 1/3 },
-                    { type: 'enemy-three', probability: 1/3 }
+                    { type: 'enemy-one', probability: 0.30 },
+                    { type: 'enemy-two', probability: 0.30 },
+                    { type: 'enemy-three', probability: 0.30 },
+                    { type: 'enemy-four', probability: 0.10 }
                 ],
                 lastEnemyMustBe: 'enemy-four' // 最后一个敌人必须是敌人四
             }
@@ -279,6 +289,12 @@ class GameManager {
             inputSystem.setEnemyConfig(config);
             console.log(`关卡 ${levelId} 敌人已设置为: ${config.type}`);
             console.log(`关卡 ${levelId} 重生次数范围: ${config.respawnRange.min}-${config.respawnRange.max}次`);
+            
+            // 如果不需要立即启动游戏，则暂停游戏系统
+            if (!startGame) {
+                inputSystem.pauseGame();
+                console.log(`关卡 ${levelId} 已暂停，等待玩家点击开始关卡`);
+            }
         } else {
             console.warn(`关卡 ${levelId} 没有配置敌人`);
         }
@@ -346,11 +362,11 @@ class GameManager {
         // 隐藏关卡信息UI，显示游戏界面
         this.hideLevelUI();
         
-        // 强制重新启动输入系统
+        // 恢复游戏系统
         const inputSystem = window.gameModules?.inputSystem;
         if (inputSystem) {
-            // 先停止当前序列
-            inputSystem.stopSequence();
+            // 恢复游戏系统
+            inputSystem.resumeGame();
             // 延迟一点时间后重新开始
             setTimeout(() => {
                 inputSystem.startNewSequence();
